@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flight Search</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Lighter gray background */
+        }
+        /* Animation for the plane icon on loading */
+        .loader-plane {
+            animation: fly 3s infinite ease-in-out;
+            transform-origin: center;
+        }
+        @keyframes fly {
+            0% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(5deg); }
+            100% { transform: translateY(0) rotate(0deg); }
+        }
+        /* Fade-in animation for flight results */
+        .flight-card {
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeIn 0.5s forwards;
+        }
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <div class="container mx-auto p-4 sm:p-6 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-indigo-600">Find Your Next Adventure</h1>
+            <p class="text-gray-500 mt-2 text-lg">Search for the best flight deals across the globe.</p>
+        </header>
+
+        <div class="bg-white rounded-xl shadow-2xl p-6 md:p-8 max-w-4xl mx-auto">
+            <form id="flight-search-form">
+                <div class="mb-6 flex flex-wrap gap-4">
+                     <label class="inline-flex items-center">
+                        <input type="radio" name="trip-type" value="round-trip" class="form-radio text-indigo-600" checked>
+                        <span class="ml-2 text-gray-700">Round Trip</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="trip-type" value="one-way" class="form-radio text-indigo-600">
+                        <span class="ml-2 text-gray-700">One Way</span>
+                    </label>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+                    <!-- Departure -->
+                    <div class="lg:col-span-1">
+                        <label for="departure" class="block text-sm font-medium text-gray-700">From</label>
+                        <input type="text" id="departure" name="departure" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" placeholder="e.g., New York">
+                    </div>
+                    <!-- Destination -->
+                    <div class="lg:col-span-1">
+                        <label for="destination" class="block text-sm font-medium text-gray-700">To</label>
+                        <input type="text" id="destination" name="destination" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" placeholder="e.g., London">
+                    </div>
+                    <!-- Departure Date -->
+                    <div>
+                        <label for="departure-date" class="block text-sm font-medium text-gray-700">Depart</label>
+                        <input type="date" id="departure-date" name="departure-date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                    </div>
+                    <!-- Return Date -->
+                    <div>
+                        <label for="return-date" class="block text-sm font-medium text-gray-700">Return</label>
+                        <input type="date" id="return-date" name="return-date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                    </div>
+                    <!-- Search Button -->
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg transform hover:scale-105 transition-transform duration-300 ease-in-out flex items-center justify-center">
+                        <i class="fas fa-search mr-2"></i> Search
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Flight Results Section -->
+        <div id="results-section" class="mt-10 max-w-5xl mx-auto">
+            <!-- Loading Indicator -->
+            <div id="loading" class="text-center py-10 hidden">
+                 <i class="fas fa-plane text-indigo-500 text-6xl loader-plane"></i>
+                 <p class="text-lg text-gray-600 mt-4 animate-pulse">Searching for flights...</p>
+            </div>
+             <!-- Error Message -->
+            <div id="error-message" class="text-center py-10 hidden bg-red-100 text-red-700 rounded-lg">
+                <p>Please fill out departure and destination fields.</p>
+            </div>
+            <!-- Results Container -->
+            <div id="flight-results" class="space-y-4">
+                <!-- Flight result cards will be injected here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const form = document.getElementById('flight-search-form');
+            const resultsSection = document.getElementById('results-section');
+            const flightResultsContainer = document.getElementById('flight-results');
+            const loadingIndicator = document.getElementById('loading');
+            const errorMessage = document.getElementById('error-message');
+            const returnDateInput = document.getElementById('return-date');
+            const tripTypeRadios = document.querySelectorAll('input[name="trip-type"]');
+            
+            // Set default departure date to today
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('departure-date').value = today;
+
+            // Handle Trip Type Change
+            tripTypeRadios.forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    if (e.target.value === 'one-way') {
+                        returnDateInput.disabled = true;
+                        returnDateInput.value = '';
+                        returnDateInput.classList.add('bg-gray-100');
+                    } else {
+                        returnDateInput.disabled = false;
+                        returnDateInput.classList.remove('bg-gray-100');
+                    }
+                });
+            });
+
+            // Handle Form Submission
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+
+                const departure = document.getElementById('departure').value;
+                const destination = document.getElementById('destination').value;
+
+                // Clear previous results and hide messages
+                flightResultsContainer.innerHTML = '';
+                errorMessage.classList.add('hidden');
+
+                // Basic validation
+                if (!departure || !destination) {
+                    errorMessage.classList.remove('hidden');
+                    return;
+                }
+                
+                // Show loading indicator
+                loadingIndicator.classList.remove('hidden');
+
+                // Simulate API call
+                setTimeout(() => {
+                    loadingIndicator.classList.add('hidden');
+                    displayFlightResults(departure, destination);
+                }, 2000); 
+            });
+
+            // Function to generate and display mock flight results
+            function displayFlightResults(departure, destination) {
+                const airlines = ['Eagle Air', 'Sky High', 'JetStream', 'Velocity Airways', 'Horizon Flights'];
+                const aircrafts = ['Boeing 737', 'Airbus A320', 'Boeing 787', 'Embraer E190'];
+                
+                flightResultsContainer.innerHTML = `<h2 class="text-2xl font-bold text-center mb-6">Available Flights from ${departure} to ${destination}</h2>`;
+
+                for (let i = 0; i < 5; i++) {
+                    const airline = airlines[Math.floor(Math.random() * airlines.length)];
+                    const aircraft = aircrafts[Math.floor(Math.random() * aircrafts.length)];
+                    const departureTime = `${String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')}:${String(Math.floor(Math.random() * 60)).padStart(2, '0')} ${Math.random() > 0.5 ? 'AM' : 'PM'}`;
+                    const arrivalTime = `${String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')}:${String(Math.floor(Math.random() * 60)).padStart(2, '0')} ${Math.random() > 0.5 ? 'AM' : 'PM'}`;
+                    const duration = `${Math.floor(Math.random() * 10) + 2}h ${Math.floor(Math.random() * 59)}m`;
+                    const stops = Math.floor(Math.random() * 3);
+                    const price = Math.floor(Math.random() * 800) + 250;
+                    
+                    const flightCard = `
+                        <div class="flight-card bg-white rounded-lg shadow-md overflow-hidden" style="animation-delay: ${i * 100}ms">
+                            <div class="p-5 grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+                                <div class="md:col-span-1 text-center md:text-left">
+                                    <p class="font-semibold text-lg text-indigo-600">${airline}</p>
+                                    <p class="text-sm text-gray-500">${aircraft}</p>
+                                </div>
+                                <div class="md:col-span-3 flex justify-around items-center text-center">
+                                    <div>
+                                        <p class="font-bold text-xl">${departureTime}</p>
+                                        <p class="text-gray-600">${departure.substring(0,3).toUpperCase()}</p>
+                                    </div>
+                                    <div class="w-1/3 text-gray-400">
+                                       <div class="text-xs">${duration}</div>
+                                       <div class="w-full bg-gray-200 rounded-full h-1 my-1"><div class="bg-indigo-400 h-1 rounded-full" style="width: 100%"></div></div>
+                                       <div class="text-xs">${stops === 0 ? 'Non-stop' : stops + (stops > 1 ? ' stops' : ' stop')}</div>
+                                    </div>
+                                    <div>
+                                        <p class="font-bold text-xl">${arrivalTime}</p>
+                                        <p class="text-gray-600">${destination.substring(0,3).toUpperCase()}</p>
+                                    </div>
+                                </div>
+                                <div class="md:col-span-1 text-center">
+                                    <p class="font-bold text-2xl text-green-600">$${price}</p>
+                                    <button class="w-full mt-2 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:shadow-lg transition-all duration-200">Book Now</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    flightResultsContainer.innerHTML += flightCard;
+                }
+            }
+        });
+    </script>
+</body>
+</html>
